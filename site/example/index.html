@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="An interactive walkthrough: A*, a momentum-aware trajectory around a moving asteroid, a QUBO you can click, and a real 8-qubit QAOA simulation.">
+<title>Mission Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; each step pairs a short explanation with a live instrument panel */
+:root{
+  --bg:#f5f6fa; --surface:#ffffff; --fg:#1b1f2e; --muted:#5a6078; --line:#d9dcea;
+  --accent:#3b4cca; --quantum:#b8621b; --classical:#2f6f8f;
+  --tint:#eceefa; --space:#0f1424; --grid:#26304d; --rock:#8a8fa3; --debris:#c4a57a;
+  --good:#2e8a57; --bad:#c2413b; --warnbg:#fbf1e4;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141d; --surface:#1a1d29; --fg:#e4e6f0; --muted:#9aa0ba; --line:#2d3144;
+  --accent:#8f9bff; --quantum:#f0a35e; --classical:#72b8d8; --tint:#20243a;
+  --space:#0a0d18; --grid:#222a44; --rock:#9aa0b8; --debris:#d6b88a; --good:#5cc98a; --bad:#f07068; --warnbg:#2a2117; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141d; --surface:#1a1d29; --fg:#e4e6f0; --muted:#9aa0ba; --line:#2d3144;
+  --accent:#8f9bff; --quantum:#f0a35e; --classical:#72b8d8; --tint:#20243a;
+  --space:#0a0d18; --grid:#222a44; --rock:#9aa0b8; --debris:#d6b88a; --good:#5cc98a; --bad:#f07068; --warnbg:#2a2117; color-scheme:dark}
+
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.6;padding-inline:16px;padding-block:40px 80px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,5vw,2.7rem);font-weight:700}
+h2{font-size:1.5rem;font-weight:700;margin-top:30px;padding-top:22px;border-top:1px solid var(--line)}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:2px}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.08rem;color:var(--muted)}
+code{font-family:var(--mono);font-size:.84em;background:var(--tint);padding:1px 5px;border-radius:4px}
+ul{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+canvas{width:100%;height:auto;display:block;border-radius:6px;background:var(--space);touch-action:manipulation}
+.controls{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--mono);font-size:.8rem}
+button{font-family:var(--mono);font-size:.8rem;padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--tint);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:hover{border-color:var(--accent)}
+label{display:flex;align-items:center;gap:8px}
+input[type=range]{width:140px;accent-color:var(--accent)}
+select{font-family:var(--mono);font-size:.8rem;padding:5px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.stat{background:var(--tint);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.stat .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:var(--mono);font-size:1.05rem;font-variant-numeric:tabular-nums;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:.74rem;color:var(--muted)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.note{border-left:3px solid var(--accent);background:var(--tint);padding:10px 14px;border-radius:0 8px 8px 0}
+.note b{font-family:var(--display)}
+.warn{background:var(--warnbg);padding:10px 14px;border-radius:8px}
+.log{font-family:var(--mono);font-size:.76rem;overflow-x:auto;white-space:nowrap;padding:8px;background:var(--tint);border-radius:6px;min-height:2.2em}
+.bits{font-family:var(--mono);font-size:1.1rem;letter-spacing:.18em;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+td,th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+tr:last-child td{border-bottom:0}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:640px){.two{grid-template-columns:1fr}}
+svg text{font-family:var(--mono)}
+.edge{cursor:pointer}
+.edge:focus-visible{outline:none}
+.edge:focus-visible line.hit{stroke:var(--accent);stroke-opacity:.35}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Worked example · <a href="../">back to the primer</a> · <a href="https://github.com/cypher-ravi/qaoa-space-pathfinding">GitHub</a></div>
+  <h1>Mission Walkthrough</h1>
+  <p class="lede">One tiny mission, followed through every idea in the primer. Each step has a live panel you can play with. Nothing here is faked: the search, the trajectory and the quantum simulation all run in your browser.</p>
+
+  <h2><span class="eyebrow">Step 1</span><br>The mission</h2>
+  <p>A small probe sits at <b>S</b> and must dock at <b>G</b>, 13 cells to the right. In between is a band of <b>debris</b> with one gap, and an <b>asteroid</b> drifting down through that gap. We want the route that burns the least fuel and never touches anything.</p>
+  <div class="panel">
+    <canvas id="fieldCanvas" width="800" height="450" aria-label="Grid of space with start S on the left, goal G on the right, a debris wall with a gap, and an asteroid drifting down"></canvas>
+    <div class="legend"><span><span class="sw" style="background:var(--debris)"></span>debris</span><span><span class="sw" style="background:var(--rock)"></span>asteroid (moves down over time)</span><span><span class="sw" style="background:var(--classical)"></span>start S</span><span><span class="sw" style="background:var(--good)"></span>goal G</span></div>
+  </div>
+  <p>Each square is one cell. Time moves in steps: in one step the probe moves by its current velocity. Every change of velocity is a <b>burn</b> and costs 1 unit of fuel (Δv) per cell/step of change.</p>
+
+  <h2><span class="eyebrow">Step 2 · Classical path planning</span><br>A* finds a path on a flat map</h2>
+  <p>First, pretend nothing moves and the probe can stop and turn instantly, like a character in a grid game. That's plain shortest path. Run both searches and compare how many cells each has to look at. Click any cell to add or remove debris.</p>
+  <div class="panel">
+    <canvas id="astarCanvas" width="800" height="450" aria-label="A* search visualization; click cells to toggle debris"></canvas>
+    <div class="controls">
+      <button class="primary" id="runAstar">Run A*</button>
+      <button id="runDijkstra">Run Dijkstra</button>
+      <button id="resetDebris">Reset map</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">Algorithm</span><span class="v" id="aAlgo">–</span></div>
+      <div class="stat"><span class="k">Cells explored</span><span class="v" id="aExplored">–</span></div>
+      <div class="stat"><span class="k">Path length</span><span class="v" id="aLen">–</span></div>
+    </div>
+    <div class="legend"><span><span class="sw" style="background:var(--accent);opacity:.45"></span>explored</span><span><span class="sw" style="background:var(--classical)"></span>final path</span></div>
+  </div>
+  <div class="note"><p><b>What you just saw.</b> Dijkstra expands outward like a ripple, in order of distance. A* adds a guess ("how far is the goal in a straight line?") to its priority queue key, so it heads for the goal and skips most of the map. Same answer, far less work.</p></div>
+
+  <h2><span class="eyebrow">Step 3 · Trajectory plus navigation</span><br>Now add momentum and a moving asteroid</h2>
+  <p>Real spacecraft don't stop and turn for free. They drift, and every change of speed costs fuel. The asteroid also moves. So we search over <b>states</b>: position, velocity and time. From each state the probe can coast or burn (up to one unit in x and y per step). This is the <b>state lattice</b>. Press play and watch both plans fly.</p>
+  <div class="panel">
+    <canvas id="trajCanvas" width="800" height="450" aria-label="Animation comparing the flat path, which collides with the asteroid, and the trajectory, which avoids it"></canvas>
+    <div class="controls">
+      <button class="primary" id="playBtn">Play</button>
+      <label for="tSlider">time <input type="range" id="tSlider" min="0" max="20" step="0.05" value="0"></label>
+      <span id="tLabel">t = 0.0</span>
+    </div>
+    <div class="controls">
+      <label for="deadline">must dock by step <input type="range" id="deadline" min="10" max="24" step="1" value="24"></label>
+      <span id="deadlineLabel">24</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">Flat A* path</span><span class="v" id="flatStatus">–</span></div>
+      <div class="stat"><span class="k">Trajectory fuel (Δv)</span><span class="v" id="trajFuel">–</span></div>
+      <div class="stat"><span class="k">Trajectory steps</span><span class="v" id="trajSteps">–</span></div>
+      <div class="stat"><span class="k">States searched</span><span class="v" id="trajExpanded">–</span></div>
+    </div>
+    <div class="legend"><span><span class="sw" style="background:var(--muted)"></span>flat A* path (ghost)</span><span><span class="sw" style="background:var(--classical)"></span>planned trajectory</span><span><span class="sw" style="background:var(--quantum)"></span>burn</span><span><span class="sw" style="background:var(--bad)"></span>collision</span></div>
+    <div class="log" id="trajLog"></div>
+  </div>
+  <div class="note"><p><b>Try the deadline slider.</b> With plenty of time, the cheapest plan is to <i>wait</i> for the asteroid to pass, then drift across: 2 units of fuel (one burn to start, one to stop). Tighten the deadline and the planner switches to a sprint that gets past the gap before the asteroid arrives, which costs more fuel. That trade-off between time and fuel is what trajectory planning is about.</p></div>
+
+  <h2><span class="eyebrow">Step 4 · QUBO</span><br>Shrink it to a quantum-sized problem</h2>
+  <p>A quantum simulator can't hold the problem above. The trajectory search looked at thousands of states, and QAOA needs a qubit per decision. So we shrink the mission until it fits in <b>8 qubits</b>. The field is now a 3×3 grid with an asteroid in the middle, so the probe goes around it either over the top or along the bottom. The top route passes through thin debris, so it costs extra fuel to dodge.</p>
+  <p>Each of the 8 edges gets one bit: <code>1</code> means "the path uses this edge". <b>Click the edges</b> to build a path and watch how the QUBO scores it. Broken paths still get a score. They just pay a big penalty.</p>
+  <div class="two">
+    <div class="panel">
+      <svg id="ring" viewBox="0 0 300 300" role="group" aria-label="3 by 3 grid with 8 clickable edges around a central asteroid" style="width:100%;height:auto"></svg>
+      <div class="controls">
+        <button id="presetBottom">Bottom route</button>
+        <button id="presetTop">Top route</button>
+        <button id="presetNone">Clear</button>
+        <button id="presetAll">All edges</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div><div class="eyebrow">Bitstring x0…x7</div><div class="bits" id="bitsOut">00000000</div></div>
+      <table aria-label="Cost breakdown">
+        <thead><tr><th>Term</th><th style="text-align:right">Cost</th></tr></thead>
+        <tbody id="costBody"></tbody>
+      </table>
+      <div id="verdict" class="warn"></div>
+    </div>
+  </div>
+  <div class="note"><p><b>Why penalties?</b> QUBO has no "if invalid, reject". Every rule becomes a term that adds cost when broken: "leave S exactly once", "arrive at G exactly once", "whatever enters a corner must leave it". Each broken rule adds 5. That's more than the fuel difference between the two routes, so a broken path never beats a real one. Out of all 256 bitstrings, only 2 are valid routes.</p></div>
+
+  <h2><span class="eyebrow">Step 5 · Qubits and QAOA</span><br>Let the quantum circuit look for the best route</h2>
+  <p>Now a real 8-qubit simulation, running in your browser. The state holds 256 amplitudes, one per bitstring. QAOA starts with all 256 equally likely (a random guess finds the best route 0.4% of the time). Then it applies <b>p</b> rounds of two layers: the <b>cost layer (γ)</b> tags each bitstring by its QUBO cost, and the <b>mixer (β)</b> lets probability flow between neighbors. Move the knobs by hand, or press <b>Auto-tune</b> to let a classical optimizer find good angles. That loop is exactly what QAOA does on real hardware.</p>
+  <div class="panel">
+    <div class="controls">
+      <label for="depth">layers p <select id="depth"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+      <label for="gamma">γ <input type="range" id="gamma" min="0" max="3.1416" step="0.005" value="0.157"></label><span id="gLabel"></span>
+      <label for="beta">β <input type="range" id="beta" min="0" max="1.5708" step="0.005" value="1.204"></label><span id="bLabel"></span>
+    </div>
+    <div class="controls">
+      <button class="primary" id="autotune">Auto-tune</button>
+      <button id="measure">Measure 100 shots</button>
+      <span id="tuneNote" style="color:var(--muted)"></span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">P(best route)</span><span class="v" id="pBest">–</span></div>
+      <div class="stat"><span class="k">P(any valid route)</span><span class="v" id="pValid">–</span></div>
+      <div class="stat"><span class="k">Avg cost</span><span class="v" id="eCost">–</span></div>
+      <div class="stat"><span class="k">Random guess</span><span class="v">0.4%</span></div>
+    </div>
+    <svg id="hist" viewBox="0 0 720 300" role="img" aria-label="Probability of the 12 most likely bitstrings" style="width:100%;height:auto"></svg>
+    <div class="legend"><span><span class="sw" style="background:var(--good)"></span>best route (bottom, fuel 4)</span><span><span class="sw" style="background:var(--classical)"></span>other valid route (top, fuel 6)</span><span><span class="sw" style="background:var(--muted)"></span>broken path</span></div>
+    <div class="log" id="shotLog">Press "Measure 100 shots" to sample the circuit like real hardware would.</div>
+  </div>
+  <div class="note"><p><b>What to notice.</b> With p = 1 the best route comes out about 7% of the time, 16 times better than guessing, but the slightly worse top route is just as likely. Adding layers pushes the best route above 20%, still far from certain. You never read the whole distribution on real hardware. You measure, get one bitstring per shot, and keep the best valid one you saw.</p></div>
+
+  <h2><span class="eyebrow">Step 6</span><br>What this example tells us</h2>
+  <ul>
+    <li><b>Classical won easily.</b> The state-lattice search solved the 16×9 mission with momentum and a moving asteroid by checking a few thousand states in milliseconds.</li>
+    <li><b>Quantum had to shrink the problem</b> to 8 qubits and two possible routes, and even then it gives the right answer only some of the time.</li>
+    <li><b>Every extra decision is another qubit.</b> The simulator doubles its memory each time, so a 4×4 grid is about the limit (see the table in the <a href="../">primer</a>).</li>
+    <li>That's why our research question is "how big is the gap, and how does it grow?" and not "where does quantum win?". This page is a first taste of the benchmark we'll build.</li>
+  </ul>
+</div>
+
+<script>
+(() => {
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- Scenario ---------- */
+const W = 16, H = 9, START = [1, 4], GOAL = [14, 4], VMAX = 2, R = 1.25;
+const DEFAULT_DEBRIS = [0,1,2,6,7,8].map(y => `7,${y}`);
+let debris = new Set(DEFAULT_DEBRIS);
+const ast = t => [10, -1.5 + t * 0.6];
+const hitsAst = (x, y, t) => { const [ax, ay] = ast(t); return Math.hypot(x - ax, y - ay) < R; };
+const blocked = (x, y, set) => x < 0 || y < 0 || x >= W || y >= H || set.has(Math.round(x) + ',' + Math.round(y));
+
+/* ---------- Canvas helpers ---------- */
+function setup(canvas) {
+  const ctx = canvas.getContext('2d');
+  const cw = canvas.width / W;
+  return { ctx, cw, ox: 0, oy: (canvas.height - cw * H) / 2 };
+}
+function drawField(g, set, opts = {}) {
+  const { ctx, cw, oy } = g, c = ctx.canvas;
+  ctx.fillStyle = css('--space'); ctx.fillRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x++) { ctx.beginPath(); ctx.moveTo(x * cw, oy); ctx.lineTo(x * cw, oy + H * cw); ctx.stroke(); }
+  for (let y = 0; y <= H; y++) { ctx.beginPath(); ctx.moveTo(0, oy + y * cw); ctx.lineTo(W * cw, oy + y * cw); ctx.stroke(); }
+  if (opts.shade) opts.shade(ctx, cw, oy);
+  ctx.fillStyle = css('--debris');
+  for (const k of set) { const [x, y] = k.split(',').map(Number);
+    for (let i = 0; i < 5; i++) { const px = x * cw + cw * (0.2 + 0.6 * ((i * 37 + x * 13 + y * 7) % 10) / 10), py = oy + y * cw + cw * (0.2 + 0.6 * ((i * 53 + x * 3 + y * 11) % 10) / 10);
+      ctx.beginPath(); ctx.arc(px, py, cw * (0.07 + 0.03 * (i % 3)), 0, 7); ctx.fill(); } }
+  const lab = (p, txt, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc((p[0] + .5) * cw, oy + (p[1] + .5) * cw, cw * .36, 0, 7); ctx.fill();
+    ctx.fillStyle = css('--space'); ctx.font = `600 ${cw * .38}px ${css('--mono')}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, (p[0] + .5) * cw, oy + (p[1] + .52) * cw); };
+  lab(START, 'S', css('--classical')); lab(GOAL, 'G', css('--good'));
+  if (opts.t !== undefined) drawAst(g, opts.t, opts.ghostAst);
+}
+function drawAst(g, t, ghost) {
+  const { ctx, cw, oy } = g; const [ax, ay] = ast(t);
+  if (ghost) { ctx.setLineDash([4, 5]); ctx.strokeStyle = css('--rock'); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo((ax + .5) * cw, oy); ctx.lineTo((ax + .5) * cw, oy + H * cw); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+  ctx.save(); ctx.beginPath(); ctx.rect(0, oy, W * cw, H * cw); ctx.clip();
+  ctx.fillStyle = css('--rock'); ctx.beginPath();
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, r = R * cw * (0.82 + 0.18 * Math.sin(i * 2.7)); const px = (ax + .5) * cw + Math.cos(a) * r, py = oy + (ay + .5) * cw + Math.sin(a) * r; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+
+/* ---------- Step 1 ---------- */
+const fieldG = setup(document.getElementById('fieldCanvas'));
+function drawStep1() { drawField(fieldG, new Set(DEFAULT_DEBRIS), { t: 6, ghostAst: true }); }
+
+/* ---------- Step 2: A* / Dijkstra ---------- */
+const aCanvas = document.getElementById('astarCanvas'), aG = setup(aCanvas);
+let aState = { explored: [], path: [] }, aTimer = null;
+function search(useH, set) {
+  const key = (x, y) => y * W + x, g = new Map([[key(...START), 0]]), came = new Map(), seen = new Set(), order = [];
+  const open = [[0, 0, ...START]];
+  while (open.length) {
+    open.sort((a, b) => a[0] - b[0] || a[1] - b[1]); const [, gc, x, y] = open.shift(); const k = key(x, y);
+    if (seen.has(k)) continue; seen.add(k); order.push([x, y]);
+    if (x === GOAL[0] && y === GOAL[1]) { const path = [[x, y]]; let c = k; while (came.has(c)) { c = came.get(c); path.unshift([c % W, Math.floor(c / W)]); } return { order, path }; }
+    for (const [dx, dy] of [[1, 0], [0, -1], [0, 1], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy; if (blocked(nx, ny, set)) continue;
+      const nk = key(nx, ny), ng = gc + 1;
+      if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, k); open.push([ng + (useH ? Math.abs(nx - GOAL[0]) + Math.abs(ny - GOAL[1]) : 0), ng, nx, ny]); }
+    }
+  }
+  return { order, path: [] };
+}
+function drawAstar(n) {
+  drawField(aG, debris, { shade: (ctx, cw, oy) => {
+    ctx.fillStyle = css('--accent'); ctx.globalAlpha = .38;
+    aState.explored.slice(0, n).forEach(([x, y]) => ctx.fillRect(x * cw + 2, oy + y * cw + 2, cw - 4, cw - 4));
+    ctx.globalAlpha = 1;
+    if (n >= aState.explored.length && aState.path.length) {
+      ctx.strokeStyle = css('--classical'); ctx.lineWidth = cw * .22; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+      aState.path.forEach(([x, y], i) => i ? ctx.lineTo((x + .5) * cw, oy + (y + .5) * cw) : ctx.moveTo((x + .5) * cw, oy + (y + .5) * cw)); ctx.stroke();
+    } } });
+}
+function runSearch(useH) {
+  clearInterval(aTimer); const r = search(useH, debris);
+  aState = { explored: r.order, path: r.path };
+  document.getElementById('aAlgo').textContent = useH ? 'A*' : 'Dijkstra';
+  document.getElementById('aExplored').textContent = r.order.length;
+  document.getElementById('aLen').textContent = r.path.length ? (r.path.length - 1) + ' moves' : 'no path';
+  if (reduced) { drawAstar(Infinity); return; }
+  let n = 0; aTimer = setInterval(() => { n += Math.max(1, Math.ceil(r.order.length / 60)); drawAstar(n); if (n >= r.order.length) { clearInterval(aTimer); drawAstar(Infinity); } }, 25);
+}
+document.getElementById('runAstar').onclick = () => runSearch(true);
+document.getElementById('runDijkstra').onclick = () => runSearch(false);
+document.getElementById('resetDebris').onclick = () => { debris = new Set(DEFAULT_DEBRIS); aState = { explored: [], path: [] }; drawAstar(0); ['aAlgo', 'aExplored', 'aLen'].forEach(i => document.getElementById(i).textContent = '–'); };
+aCanvas.addEventListener('click', e => {
+  const r = aCanvas.getBoundingClientRect(), sx = aCanvas.width / r.width;
+  const x = Math.floor((e.clientX - r.left) * sx / aG.cw), y = Math.floor(((e.clientY - r.top) * sx - aG.oy) / aG.cw);
+  if (x < 0 || y < 0 || x >= W || y >= H || (x === START[0] && y === START[1]) || (x === GOAL[0] && y === GOAL[1])) return;
+  const k = x + ',' + y; debris.has(k) ? debris.delete(k) : debris.add(k);
+  clearInterval(aTimer); aState = { explored: [], path: [] }; drawAstar(0);
+});
+
+/* ---------- Step 3: state-lattice trajectory ---------- */
+const tCanvas = document.getElementById('trajCanvas'), tG = setup(tCanvas);
+const fixed = new Set(DEFAULT_DEBRIS);
+function segFree(x0, y0, x1, y1, t) {
+  for (let k = 0; k <= 4; k++) { const f = k / 4, x = x0 + (x1 - x0) * f, y = y0 + (y1 - y0) * f; if (blocked(x, y, fixed) || hitsAst(x, y, t + f)) return false; }
+  return true;
+}
+function plan(T) {
+  const N = T * W * H * 25, idx = (x, y, vx, vy, t) => ((((t * W + x) * H + y) * 5 + (vx + 2)) * 5 + (vy + 2));
+  const dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), heap = [];
+  const push = (c, s) => { heap.push([c, s]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { let l = 2 * i + 1, r = l + 1, m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  const s0 = idx(START[0], START[1], 0, 0, 0); dist[s0] = 0; push(0, [START[0], START[1], 0, 0, 0]); let expanded = 0;
+  while (heap.length) {
+    const [c, [x, y, vx, vy, t]] = pop(); const si = idx(x, y, vx, vy, t); if (c > dist[si]) continue; expanded++;
+    if (x === GOAL[0] && y === GOAL[1] && vx === 0 && vy === 0) {
+      const out = []; let k = si;
+      while (k >= 0) { let r = k; const vy_ = r % 5 - 2; r = (r / 5) | 0; const vx_ = r % 5 - 2; r = (r / 5) | 0; const yy = r % H; r = (r / H) | 0; out.unshift({ x: r % W, y: yy, vx: vx_, vy: vy_, t: (r / W) | 0 }); k = prev[k]; }
+      return { traj: out, fuel: Math.round(c), expanded };
+    }
+    if (t + 1 >= T) continue;
+    for (let ax = -1; ax <= 1; ax++) for (let ay = -1; ay <= 1; ay++) {
+      const nvx = vx + ax, nvy = vy + ay; if (Math.abs(nvx) > VMAX || Math.abs(nvy) > VMAX) continue;
+      const nx = x + nvx, ny = y + nvy; if (blocked(nx, ny, fixed) || !segFree(x, y, nx, ny, t)) continue;
+      const nc = c + Math.abs(ax) + Math.abs(ay) + 0.01, ni = idx(nx, ny, nvx, nvy, t + 1);
+      if (nc < dist[ni]) { dist[ni] = nc; prev[ni] = si; push(nc, [nx, ny, nvx, nvy, t + 1]); }
+    }
+  }
+  return { traj: null, fuel: null, expanded };
+}
+const flat = search(true, fixed).path;
+let flatHit = -1; for (let t = 0; t < flat.length; t++) { if (hitsAst(flat[t][0], flat[t][1], t)) { flatHit = t; break; } }
+let traj = null, tNow = 0, playing = false, raf = null;
+const tSlider = document.getElementById('tSlider');
+function lerp(arr, t, get) { const i = Math.min(Math.floor(t), arr.length - 1), j = Math.min(i + 1, arr.length - 1), f = Math.min(1, t - i); const a = get(arr[i]), b = get(arr[j]); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
+function drawTraj() {
+  const { ctx, cw, oy } = tG, P = p => [(p[0] + .5) * cw, oy + (p[1] + .5) * cw];
+  drawField(tG, fixed, { t: tNow });
+  // flat ghost path
+  ctx.setLineDash([6, 6]); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2; ctx.beginPath();
+  flat.forEach((p, i) => { const q = P(p); i ? ctx.lineTo(...q) : ctx.moveTo(...q); }); ctx.stroke(); ctx.setLineDash([]);
+  const tf = flatHit >= 0 ? Math.min(tNow, flatHit) : tNow; const fp = P(lerp(flat, tf, p => p));
+  ctx.fillStyle = css('--muted'); ctx.beginPath(); ctx.arc(...fp, cw * .2, 0, 7); ctx.fill();
+  if (flatHit >= 0 && tNow >= flatHit) { const q = P(flat[flatHit]); ctx.strokeStyle = css('--bad'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(q[0] - cw * .35, q[1] - cw * .35); ctx.lineTo(q[0] + cw * .35, q[1] + cw * .35); ctx.moveTo(q[0] + cw * .35, q[1] - cw * .35); ctx.lineTo(q[0] - cw * .35, q[1] + cw * .35); ctx.stroke(); }
+  if (!traj) return;
+  ctx.strokeStyle = css('--classical'); ctx.lineWidth = 3; ctx.beginPath();
+  traj.forEach((s, i) => { const q = P([s.x, s.y]); i ? ctx.lineTo(...q) : ctx.moveTo(...q); }); ctx.stroke();
+  traj.forEach((s, i) => { if (i && (s.vx !== traj[i - 1].vx || s.vy !== traj[i - 1].vy)) { const q = P([traj[i - 1].x, traj[i - 1].y]); ctx.fillStyle = css('--quantum'); ctx.beginPath(); ctx.arc(...q, cw * .13, 0, 7); ctx.fill(); } });
+  const pos = lerp(traj, tNow, s => [s.x, s.y]), q = P(pos), i = Math.min(Math.floor(tNow), traj.length - 1), s = traj[Math.min(i + 1, traj.length - 1)];
+  const burning = i + 1 < traj.length && (s.vx !== traj[i].vx || s.vy !== traj[i].vy) && tNow - i < .35;
+  if (burning) { ctx.fillStyle = css('--quantum'); ctx.beginPath(); ctx.arc(q[0] - Math.sign(s.vx - traj[i].vx) * cw * .3, q[1] - Math.sign(s.vy - traj[i].vy) * cw * .3, cw * .16, 0, 7); ctx.fill(); }
+  ctx.fillStyle = css('--classical'); ctx.beginPath(); ctx.arc(...q, cw * .24, 0, 7); ctx.fill();
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1.5; ctx.stroke();
+  document.getElementById('tLabel').textContent = 't = ' + tNow.toFixed(1);
+}
+function replan() {
+  const T = +document.getElementById('deadline').value; document.getElementById('deadlineLabel').textContent = T;
+  const r = plan(T + 1); traj = r.traj;
+  document.getElementById('trajExpanded').textContent = r.expanded.toLocaleString();
+  document.getElementById('trajFuel').textContent = traj ? r.fuel + ' units' : 'no safe plan';
+  document.getElementById('trajSteps').textContent = traj ? traj.length - 1 : '–';
+  const log = document.getElementById('trajLog');
+  if (!traj) log.textContent = 'No collision-free trajectory reaches G in time. Try a later deadline.';
+  else log.textContent = traj.slice(1).map((s, i) => { const p = traj[i], ax = s.vx - p.vx, ay = s.vy - p.vy; return `t${i}: ${ax || ay ? `BURN (${ax},${ay})` : (s.vx || s.vy ? 'coast' : 'wait')}`; }).join('  ·  ');
+  tSlider.max = Math.max(flat.length - 1, traj ? traj.length - 1 : 0);
+  tNow = Math.min(tNow, +tSlider.max); tSlider.value = tNow; drawTraj();
+}
+document.getElementById('flatStatus').textContent = flatHit >= 0 ? `hits asteroid at t=${flatHit}` : 'safe';
+tSlider.oninput = () => { tNow = +tSlider.value; playing = false; document.getElementById('playBtn').textContent = 'Play'; drawTraj(); };
+document.getElementById('deadline').oninput = replan;
+document.getElementById('playBtn').onclick = () => {
+  playing = !playing; document.getElementById('playBtn').textContent = playing ? 'Pause' : 'Play';
+  if (playing) { if (tNow >= +tSlider.max) tNow = 0; let last = performance.now();
+    const step = now => { if (!playing) return; tNow = Math.min(+tSlider.max, tNow + (now - last) / (reduced ? 150 : 450)); last = now; tSlider.value = tNow; drawTraj();
+      if (tNow >= +tSlider.max) { playing = false; document.getElementById('playBtn').textContent = 'Play'; return; } raf = requestAnimationFrame(step); };
+    raf = requestAnimationFrame(step); }
+};
+
+/* ---------- Step 4: QUBO ring ---------- */
+const FUEL = [1, 2, 2, 1, 1, 1, 1, 1], PEN = 5, NQ = 8, NS = 256;
+const NODE = { S: [0, 0], G: [2, 2] };
+const coords = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+const EDGES = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]];
+const RULES = [
+  { name: 'leave S exactly once', e: [0, 7], kind: 'one' },
+  { name: 'arrive at G exactly once', e: [3, 4], kind: 'one' },
+  { name: 'top-middle: in = out', e: [0, 1], kind: 'eq' },
+  { name: 'top-right: in = out', e: [1, 2], kind: 'eq' },
+  { name: 'right-middle: in = out', e: [2, 3], kind: 'eq' },
+  { name: 'bottom-middle: in = out', e: [4, 5], kind: 'eq' },
+  { name: 'bottom-left: in = out', e: [5, 6], kind: 'eq' },
+  { name: 'left-middle: in = out', e: [6, 7], kind: 'eq' },
+];
+const bit = (z, i) => (z >> i) & 1;
+function breakdown(z) {
+  let fuel = 0; for (let i = 0; i < NQ; i++) fuel += FUEL[i] * bit(z, i);
+  const rules = RULES.map(r => { const a = bit(z, r.e[0]), b = bit(z, r.e[1]); const v = r.kind === 'one' ? (1 - a - b) ** 2 : (a - b) ** 2; return { ...r, cost: PEN * v }; });
+  return { fuel, rules, total: fuel + rules.reduce((s, r) => s + r.cost, 0) };
+}
+const COST = Array.from({ length: NS }, (_, z) => breakdown(z).total);
+const BEST = 0b11110000, OTHER = 0b00001111;
+const bitsStr = z => Array.from({ length: NQ }, (_, i) => bit(z, i)).join('');
+let zSel = 0;
+const ring = document.getElementById('ring'), NS_SVG = 'http://www.w3.org/2000/svg';
+const pt = ([x, y]) => [50 + x * 100, 50 + y * 100];
+function el(tag, attrs, parent) { const e = document.createElementNS(NS_SVG, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || ring).appendChild(e); return e; }
+function drawRing() {
+  ring.innerHTML = '';
+  el('rect', { x: 0, y: 0, width: 300, height: 300, rx: 8, fill: 'var(--space)' });
+  el('rect', { x: 110, y: 10, width: 180, height: 130, rx: 10, fill: 'var(--debris)', 'fill-opacity': .16 });
+  el('text', { x: 200, y: 92, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--debris)' }).textContent = 'thin debris';
+  el('text', { x: 200, y: 106, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--debris)' }).textContent = '+1 fuel';
+  el('circle', { cx: 150, cy: 150, r: 34, fill: 'var(--rock)' });
+  el('text', { x: 150, y: 154, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--space)' }).textContent = 'asteroid';
+  EDGES.forEach(([a, b], i) => {
+    const [x1, y1] = pt(coords[a]), [x2, y2] = pt(coords[b]), on = bit(zSel, i);
+    const g = el('g', { class: 'edge', tabindex: 0, role: 'button', 'aria-pressed': on ? 'true' : 'false', 'aria-label': `edge x${i}, fuel ${FUEL[i]}` });
+    el('line', { class: 'hit', x1, y1, x2, y2, stroke: 'transparent', 'stroke-width': 28, 'stroke-linecap': 'round' }, g);
+    el('line', { x1, y1, x2, y2, stroke: on ? 'var(--classical)' : 'var(--grid)', 'stroke-width': on ? 9 : 5, 'stroke-linecap': 'round' }, g);
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, off = (y1 === y2) ? [0, (y1 < 150 ? -14 : 20)] : [(x1 < 150 ? -18 : 18), 4];
+    el('text', { x: mx + off[0], y: my + off[1], 'text-anchor': 'middle', 'font-size': 11, fill: on ? 'var(--classical)' : 'var(--muted)' }, g).textContent = `x${i}:${FUEL[i]}`;
+    const toggle = () => { zSel ^= (1 << i); drawRing(); drawCost(); ring.querySelectorAll('.edge')[i].focus(); };
+    g.addEventListener('click', toggle); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+  coords.forEach((c, i) => { const [x, y] = pt(c); const isS = i === 0, isG = i === 4;
+    el('circle', { cx: x, cy: y, r: isS || isG ? 15 : 7, fill: isS ? 'var(--classical)' : isG ? 'var(--good)' : 'var(--muted)' });
+    if (isS || isG) el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 600, fill: 'var(--space)' }).textContent = isS ? 'S' : 'G'; });
+}
+function drawCost() {
+  const b = breakdown(zSel); document.getElementById('bitsOut').textContent = bitsStr(zSel);
+  const rows = [`<tr><td>fuel for edges used</td><td class="num">${b.fuel}</td></tr>`].concat(b.rules.map(r => `<tr><td>${r.name}</td><td class="num" style="color:${r.cost ? 'var(--bad)' : 'var(--muted)'}">${r.cost ? '+' + r.cost : '0'}</td></tr>`));
+  rows.push(`<tr><td><b>total QUBO cost</b></td><td class="num"><b>${b.total}</b></td></tr>`);
+  document.getElementById('costBody').innerHTML = rows.join('');
+  const broken = b.rules.filter(r => r.cost).length;
+  document.getElementById('verdict').textContent = broken ? `Broken path: ${broken} rule${broken > 1 ? 's' : ''} violated, so it pays ${broken * PEN} in penalties.` : (zSel === BEST ? 'Valid route along the bottom. Cost 4, the best possible answer.' : 'Valid route over the top. Cost 6, valid but not the cheapest.');
+}
+const preset = z => { zSel = z; drawRing(); drawCost(); };
+document.getElementById('presetBottom').onclick = () => preset(BEST);
+document.getElementById('presetTop').onclick = () => preset(OTHER);
+document.getElementById('presetNone').onclick = () => preset(0);
+document.getElementById('presetAll').onclick = () => preset(255);
+
+/* ---------- Step 5: QAOA statevector simulation ---------- */
+function simulate(gs, bs) {
+  const re = new Float64Array(NS).fill(1 / 16), im = new Float64Array(NS);
+  for (let l = 0; l < gs.length; l++) {
+    const g = gs[l], cb = Math.cos(bs[l]), sb = Math.sin(bs[l]);
+    for (let z = 0; z < NS; z++) { const a = -g * COST[z], c = Math.cos(a), s = Math.sin(a), r = re[z], i = im[z]; re[z] = r * c - i * s; im[z] = r * s + i * c; }
+    for (let q = 0; q < NQ; q++) { const m = 1 << q; for (let z = 0; z < NS; z++) if (!(z & m)) { const w = z | m, ar = re[z], ai = im[z], br = re[w], bi = im[w];
+      re[z] = cb * ar + sb * bi; im[z] = cb * ai - sb * br; re[w] = cb * br + sb * ai; im[w] = cb * bi - sb * ar; } }
+  }
+  const p = new Float64Array(NS); for (let z = 0; z < NS; z++) p[z] = re[z] ** 2 + im[z] ** 2; return p;
+}
+const expCost = p => p.reduce((s, v, z) => s + v * COST[z], 0);
+let params = { g: [0.157], b: [1.204] }, probs = null;
+const gammaEl = document.getElementById('gamma'), betaEl = document.getElementById('beta'), depthEl = document.getElementById('depth');
+function syncSliders() {
+  const manual = params.g.length === 1;
+  gammaEl.disabled = betaEl.disabled = !manual;
+  gammaEl.value = params.g[0]; betaEl.value = params.b[0];
+  document.getElementById('gLabel').textContent = manual ? (+params.g[0]).toFixed(2) : 'tuned';
+  document.getElementById('bLabel').textContent = manual ? (+params.b[0]).toFixed(2) : 'tuned';
+}
+function drawHist() {
+  probs = simulate(params.g, params.b);
+  const idx = Array.from({ length: NS }, (_, z) => z).sort((a, b) => probs[b] - probs[a]).slice(0, 12);
+  let valid = probs[BEST] + probs[OTHER];
+  document.getElementById('pBest').textContent = (probs[BEST] * 100).toFixed(1) + '%';
+  document.getElementById('pValid').textContent = (valid * 100).toFixed(1) + '%';
+  document.getElementById('eCost').textContent = expCost(probs).toFixed(2);
+  const svg = document.getElementById('hist'); svg.innerHTML = '';
+  const top = Math.max(0.1, Math.ceil(probs[idx[0]] * 20) / 20), x0 = 46, y0 = 250, h = 220, bw = (720 - x0 - 10) / 12;
+  const add = (tag, a, parent) => { const e = document.createElementNS(NS_SVG, tag); for (const k in a) e.setAttribute(k, a[k]); (parent || svg).appendChild(e); return e; };
+  for (let k = 0; k <= 4; k++) { const v = top * k / 4, y = y0 - h * k / 4;
+    add('line', { x1: x0, x2: 712, y1: y, y2: y, stroke: 'var(--line)', 'stroke-width': 1 });
+    add('text', { x: x0 - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }).textContent = (v * 100).toFixed(0) + '%'; }
+  idx.forEach((z, i) => { const v = probs[z], bh = h * v / top, x = x0 + i * bw + 4;
+    const col = z === BEST ? 'var(--good)' : z === OTHER ? 'var(--classical)' : 'var(--muted)';
+    add('rect', { x, y: y0 - bh, width: bw - 8, height: Math.max(bh, 1), rx: 3, fill: col, 'fill-opacity': z === BEST || z === OTHER ? 1 : .55 });
+    add('text', { x: x + (bw - 8) / 2, y: y0 - bh - 5, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--fg)' }).textContent = (v * 100).toFixed(1);
+    const t = add('text', { x: x + (bw - 8) / 2, y: y0 + 14, 'text-anchor': 'end', 'font-size': 10, fill: 'var(--muted)', transform: `rotate(-40 ${x + (bw - 8) / 2} ${y0 + 14})` }); t.textContent = bitsStr(z); });
+}
+gammaEl.oninput = () => { params.g = [+gammaEl.value]; syncSliders(); drawHist(); };
+betaEl.oninput = () => { params.b = [+betaEl.value]; syncSliders(); drawHist(); };
+function tune(p) {
+  const f = x => expCost(simulate(x.slice(0, p), x.slice(p)));
+  let best = null;
+  for (let i = 0; i <= 60; i++) for (let j = 0; j <= 30; j++) { const x = [i * Math.PI / 60, j * Math.PI / 60]; const v = f(x); if (!best || v < best[1]) best = [x, v]; }
+  let [g, b] = [[best[0][0]], [best[0][1]]];
+  for (let k = 2; k <= p; k++) { g = Array.from({ length: k }, (_, i) => g[Math.min(g.length - 1, Math.floor(i * g.length / k))] * (i + 1) / k * 1.4); b = Array.from({ length: k }, (_, i) => b[Math.min(b.length - 1, Math.floor(i * b.length / k))] * (1 - i / (2 * k))); }
+  let x = [...g, ...b], fx = f(x), step = 0.2;
+  while (step > 1e-3) { let imp = false; for (let d = 0; d < x.length; d++) for (const s of [1, -1]) { const y = [...x]; y[d] += s * step; const fy = f(y); if (fy < fx) { x = y; fx = fy; imp = true; } } if (!imp) step /= 2; }
+  return { g: x.slice(0, p), b: x.slice(p) };
+}
+document.getElementById('autotune').onclick = () => {
+  const p = +depthEl.value; document.getElementById('tuneNote').textContent = 'tuning…';
+  setTimeout(() => { params = tune(p); syncSliders(); drawHist(); document.getElementById('tuneNote').textContent = `tuned ${2 * p} angles to minimize the average cost`; }, 20);
+};
+depthEl.onchange = () => { document.getElementById('autotune').click(); };
+document.getElementById('measure').onclick = () => {
+  const counts = new Map(); const cdf = []; let s = 0; for (let z = 0; z < NS; z++) { s += probs[z]; cdf.push(s); }
+  for (let k = 0; k < 100; k++) { const r = Math.random() * s; let z = cdf.findIndex(c => c >= r); if (z < 0) z = NS - 1; counts.set(z, (counts.get(z) || 0) + 1); }
+  const best = counts.get(BEST) || 0, other = counts.get(OTHER) || 0;
+  const bestSeen = [...counts.keys()].reduce((a, z) => COST[z] < COST[a] ? z : a, [...counts.keys()][0]);
+  document.getElementById('shotLog').textContent = `100 shots: bottom route ${best}×, top route ${other}×, broken paths ${100 - best - other}×. Best bitstring seen: ${bitsStr(bestSeen)} (cost ${COST[bestSeen]}).`;
+};
+
+/* ---------- Init and theme redraw ---------- */
+function redrawAll() { drawStep1(); drawAstar(aState.explored.length ? Infinity : 0); drawTraj(); drawRing(); drawHist(); }
+drawStep1(); drawAstar(0); replan(); drawRing(); drawCost(); syncSliders(); drawHist();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+if (document.fonts) document.fonts.ready.then(redrawAll);
+})();
+</script>
+
+</body>
+</html>

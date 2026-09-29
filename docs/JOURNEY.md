@@ -56,3 +56,14 @@ What changed:
 ## 2026-09-29 · Project website
 
 Published the illustrated primer at https://cypher-ravi.github.io/qaoa-space-pathfinding/ via GitHub Pages. The site lives in `site/`, and the interactive visualizer will be added there later.
+
+## 2026-09-29 · Interactive walkthrough
+
+Added an [interactive walkthrough](https://cypher-ravi.github.io/qaoa-space-pathfinding/example/) that follows one small mission through the primer:
+
+- A* vs Dijkstra on a flat 16×9 map (A* explores 14 cells, Dijkstra about 100).
+- A state-lattice planner with momentum and a moving asteroid. The flat path hits the asteroid; the trajectory waits for it (2 fuel units) or sprints ahead under a tight deadline (4 units).
+- The problem shrunk to 8 qubits: a 3×3 ring around an asteroid with a clickable QUBO.
+- A real in-browser QAOA simulation. P(best route) goes from 0.4% (random) to about 7% at p=1 and about 25% at p=4.
+
+First hands-on evidence for the research framing: classical solves the full mission instantly, while QAOA needs a tiny problem and still only finds the best answer some of the time.

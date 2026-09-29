@@ -31,6 +31,7 @@ We measure trajectory cost (total Δv), how often the quantum solver returns a v
 ## Where to read
 
 - **Website:** https://cypher-ravi.github.io/qaoa-space-pathfinding/ (the illustrated primer; the visualizer will live here too)
+- **Interactive walkthrough:** https://cypher-ravi.github.io/qaoa-space-pathfinding/example/ (one small mission through A*, a momentum-aware trajectory, a clickable QUBO and a real 8-qubit QAOA simulation)
 - [docs/JOURNEY.md](docs/JOURNEY.md): dated log of what we did, learned, and decided
 - [docs/primer.md](docs/primer.md): every concept from scratch, for software engineers
 - [docs/prior-work.md](docs/prior-work.md): what others have already done, and our gap
