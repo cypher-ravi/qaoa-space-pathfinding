@@ -41,3 +41,7 @@ What changed:
 ## 2026-09-29 · Repo created
 
 Created this repo, [qaoa-space-pathfinding](https://github.com/cypher-ravi/qaoa-space-pathfinding), to document the project from the start. Everything above this entry was written before the repo existed.
+
+## 2026-09-29 · Project website
+
+Published the illustrated primer at https://cypher-ravi.github.io/qaoa-space-pathfinding/ via GitHub Pages. The site lives in `site/`, and the interactive visualizer will be added there later.

@@ -25,6 +25,7 @@ We measure path cost, how often the quantum solver returns a valid collision-fre
 
 ## Where to read
 
+- **Website:** https://cypher-ravi.github.io/qaoa-space-pathfinding/ (the illustrated primer; the visualizer will live here too)
 - [docs/JOURNEY.md](docs/JOURNEY.md): dated log of what we did, learned, and decided
 - [docs/primer.md](docs/primer.md): every concept from scratch, for software engineers
 - [docs/prior-work.md](docs/prior-work.md): what others have already done, and our gap
@@ -33,3 +34,7 @@ We measure path cost, how often the quantum solver returns a valid collision-fre
 ## Stack
 
 Python, Qiskit, OR-Tools. Details will land with phase 1.
+
+## Website
+
+Everything in [`site/`](site/) is published to GitHub Pages by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push to `main` that touches it.

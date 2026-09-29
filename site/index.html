@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A from-scratch primer on path planning, QUBO, qubits and QAOA for navigating a spacecraft through asteroids and debris.">
+<title>QAOA Space Pathfinding Primer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0}
+img{max-width:100%}
+/* Layout: a single reading column like a field manual, with margin notes that fold inline on phones */
+:root{
+  --bg:#f5f6fa; --surface:#ffffff; --fg:#1b1f2e; --muted:#5a6078; --line:#d9dcea;
+  --accent:#3b4cca;        /* star-chart indigo */
+  --quantum:#b8621b;       /* amber for quantum things */
+  --classical:#2f6f8f;     /* slate blue for classical things */
+  --tint:#eceefa; --warn:#8a4b12; --warnbg:#fbf1e4;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#12141d; --surface:#1a1d29; --fg:#e4e6f0; --muted:#9aa0ba; --line:#2d3144;
+  --accent:#8f9bff; --quantum:#f0a35e; --classical:#72b8d8; --tint:#20243a; --warn:#f3c28f; --warnbg:#2a2117; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#12141d; --surface:#1a1d29; --fg:#e4e6f0; --muted:#9aa0ba; --line:#2d3144;
+  --accent:#8f9bff; --quantum:#f0a35e; --classical:#72b8d8; --tint:#20243a; --warn:#f3c28f; --warnbg:#2a2117; color-scheme:dark }
+
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.62;padding-inline:16px;padding-block:40px 80px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,5vw,2.8rem);font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.6rem;font-weight:700;margin-top:34px;padding-top:22px;border-top:1px solid var(--line)}
+h3{font-size:1.18rem;font-weight:700;margin-top:14px}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.1rem;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--tint);padding:1px 5px;border-radius:4px}
+ul,ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
+.q{color:var(--quantum);font-weight:600}
+.c{color:var(--classical);font-weight:600}
+
+.tldr{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px;display:flex;flex-direction:column;gap:10px}
+.tldr h2{border:0;margin:0;padding:0;font-size:1.2rem}
+
+.analogy{border-left:3px solid var(--accent);background:var(--tint);padding:12px 16px;border-radius:0 8px 8px 0;display:flex;flex-direction:column;gap:6px}
+.analogy .eyebrow{color:var(--accent)}
+.caveat{background:var(--warnbg);color:var(--fg);padding:12px 16px;border-radius:8px;display:flex;flex-direction:column;gap:6px}
+.caveat .eyebrow{color:var(--warn)}
+
+pre{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:.82rem;line-height:1.55}
+
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;font-family:var(--mono);font-size:.7rem;padding:1px 7px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--classical)} .pill.q{color:var(--quantum);font-weight:400} .pill.bad{color:var(--warn)}
+
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figcaption{font-size:.85rem;color:var(--muted)}
+svg text{font-family:var(--mono)}
+.toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:.8rem}
+.rec{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:baseline}
+.rec .n{font-family:var(--mono);color:var(--accent);font-weight:600}
+.rec > div{min-width:0}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Primer · <a href="https://github.com/cypher-ravi/qaoa-space-pathfinding">qaoa-space-pathfinding on GitHub</a></div>
+  <h1>QAOA Space Pathfinding Primer</h1>
+  <p class="lede">Everything you need to follow the project on navigating a spacecraft through asteroids and debris, explained for a software engineer who has never touched quantum computing or path planning. Part 1 builds the concepts from zero. Part 2 surveys what already exists. Part 3 says what that means for our plan.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <a href="#problem">1 Routing as optimization</a>
+    <a href="#classical">2 Classical solvers</a>
+    <a href="#qubo">3 QUBO</a>
+    <a href="#qubits">4 Qubits and circuits</a>
+    <a href="#qaoa">5 QAOA</a>
+    <a href="#hardware">6 Simulators vs hardware</a>
+    <a href="#advantage">7 Quantum advantage</a>
+    <a href="#prior">Prior work</a>
+    <a href="#plan">Plan changes</a>
+  </nav>
+
+  <section class="tldr" aria-label="Short version">
+    <h2>The short version</h2>
+    <ul>
+      <li>Our problem is <b>navigating a spacecraft through a field of asteroids and debris</b>: the cheapest collision-free path from start to goal. That is a shortest-path problem on a graph, the home turf of A*.</li>
+      <li>People have already run <b>QAOA on small shortest-path and grid path-planning problems</b>, on small routing problems (TSP), and <b>quantum annealing on space problems</b> (trajectories, debris removal). The consistent finding: at sizes today's machines and simulators can handle, good classical methods win.</li>
+      <li>So the "threshold where quantum beats classical" will very likely not appear in our experiments. That is still a publishable, useful result if we measure it carefully. What's missing in the literature is an <b>open, reproducible, gate-based QAOA benchmark for navigating a realistic hazard field</b> (moving asteroids and debris, fuel-style costs). That is where we can add something.</li>
+    </ul>
+  </section>
+
+  <h2 id="problem"><span class="eyebrow">Part 1 · Concept 1</span><br>Path planning is an optimization problem</h2>
+  <p>"Path planning" covers two different questions, and it helps to keep them apart:</p>
+  <ul>
+    <li><b>Point-to-point:</b> how do I get from A to B while avoiding obstacles? (Google Maps directions, a robot crossing a room.)</li>
+    <li><b>Ordering, or routing:</b> I must visit many places. In what order should I visit them so the total cost is lowest? (A delivery driver's day, a spacecraft touring asteroids.)</li>
+  </ul>
+  <p><b>Our project is the first kind.</b> A spacecraft must cross a field of asteroids and debris to reach a goal without a collision, using as little fuel as possible (fuel is measured as <b>Δv</b>, "delta-v", the change in velocity the engine must deliver). We turn space into a graph: a grid of cells, with cells occupied by an asteroid or debris removed. Because obstacles move, we can stack the grid over time into a <b>space-time grid</b>, where a node means "this cell at this moment".</p>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>It is like routing a packet through a network where some links are down, and the set of down links changes every tick. Find the cheapest route that never touches a dead link. The number of possible routes explodes with grid size, so you need a clever search, not enumeration.</p>
+  </div>
+  <p>"Optimization" just means: define a <b>cost function</b> (total Δv), define the <b>constraints</b> (start at the start, end at the goal, never enter a blocked cell), and find the input that minimizes cost while respecting constraints. Every solver in this project, classical or quantum, is a different strategy for that same search.</p>
+
+  <h2 id="classical"><span class="eyebrow">Part 1 · Concept 2</span><br>Classical solvers</h2>
+  <p>These are the baselines the quantum approach has to beat.</p>
+  <h3>Dijkstra (exact)</h3>
+  <p>Start at the start node and expand outward, always taking the cheapest unexplored node next from a priority queue. When you pop the goal, you have the guaranteed cheapest path. Runs in O(E log V), so it handles grids with millions of cells easily. It is our ground truth for scoring every other method.</p>
+  <h3>A* search (the main baseline)</h3>
+  <p>A* is Dijkstra plus a heuristic that guesses the remaining cost, such as the straight-line distance to the goal. Nodes are prioritized by "cost so far + estimated cost to goal", so it explores toward the goal first and skips most of the grid. If the guess never overestimates, the answer is still optimal. It is the standard tool for exactly our problem: games, robots, and rovers all use it.</p>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>Dijkstra is a BFS where the queue is a min-heap on cost. A* is the same code with one extra term in the heap key. That tiny change is why it's so fast in practice.</p>
+  </div>
+  <h3>Integer Linear Programming (ILP)</h3>
+  <p>You write the problem declaratively as variables, linear constraints, and a linear objective, then hand it to a solver (OR-Tools, Gurobi, HiGHS, PuLP). The solver uses branch-and-bound: it splits the search space, computes cheap lower bounds, and prunes whole branches that cannot beat the best answer found so far.</p>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>ILP is to optimization what SQL is to data. You describe <i>what</i> you want, and a decades-tuned engine figures out <i>how</i>. Modern solvers handle problems with millions of variables.</p>
+  </div>
+  <h3>Simulated annealing (heuristic)</h3>
+  <p>Start with some path, repeatedly make a small change (reroute one section), and keep it if it's better. Sometimes keep a worse one too, with a probability that shrinks over time (the "temperature" cools). Early on it explores; late it settles. It's hill climbing that can escape local minima. It is fast and simple. Crucially, it can take the exact same QUBO as QAOA (next section), which makes it the fairest head-to-head comparison.</p>
+
+  <h2 id="qubo"><span class="eyebrow">Part 1 · Concept 3</span><br>QUBO: the format quantum optimizers accept</h2>
+  <p>Quantum optimizers don't take "a list of asteroids and a cost matrix". They take one specific shape of problem called <b>QUBO</b>, short for Quadratic Unconstrained Binary Optimization:</p>
+  <ul>
+    <li><b>Binary:</b> every decision is a bit, <code>x = 0 or 1</code>.</li>
+    <li><b>Quadratic:</b> the cost is a sum of terms involving at most two bits at a time: <code>cost(x) = Σ Q<sub>ij</sub> · x<sub>i</sub> · x<sub>j</sub></code>.</li>
+    <li><b>Unconstrained:</b> there are no separate rules. Any rule must be baked into the cost.</li>
+  </ul>
+  <p>For a path, the usual trick (in the style of <a href="https://arxiv.org/abs/1302.5843">Lucas 2014</a>) uses one bit per edge of the grid: <code>x[e] = 1</code> means "edge <i>e</i> is part of the path". Rules like "whatever enters a cell must leave it" become <b>penalty terms</b>: a big number added to the cost whenever a rule is broken. Blocked cells are simply removed from the graph, so their edges never become bits.</p>
+<pre># 3x3 grid, start S top-left, goal G bottom-right, one debris cell X
+#   S - . - .
+#   |   |   |
+#   . - X - .      edges touching X are removed
+#   |   |   |
+#   . - . - G
+# bit x[e] = 1 means "the path uses edge e"
+
+cost(x) =  Σ_e  dv[e] * x[e]                             # fuel for each step
+        + P * (1 - Σ_{e out of S} x[e])²                 # leave the start once
+        + P * (1 - Σ_{e into G}  x[e])²                  # arrive at the goal once
+        + P * Σ_{other cells v} (Σ_in x[e] - Σ_out x[e])²   # no dead ends
+# P is "big enough" that breaking a rule never pays off</pre>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>Penalty terms are like replacing hard validation (<code>throw</code> on bad input) with a huge score deduction. The optimizer is allowed to propose invalid answers; they just score so badly that it learns to avoid them. The catch: it still proposes them sometimes, so we must check and count how often.</p>
+  </div>
+  <p>Cost of this encoding: <b>one bit per usable edge</b>. A 4×4 grid already has 24 edges. That number becomes the number of qubits, and it grows fast.</p>
+
+  <h2 id="qubits"><span class="eyebrow">Part 1 · Concept 4</span><br>Qubits and quantum circuits</h2>
+  <p>A normal bit is 0 or 1. A <b>qubit</b> holds a pair of numbers called <b>amplitudes</b>, one for 0 and one for 1. When you <b>measure</b> it, you get 0 or 1 at random, with probabilities given by those amplitudes squared, and the qubit then stays at whatever you saw.</p>
+  <p>With <i>n</i> qubits, the state holds one amplitude for <i>every</i> possible n-bit string: 2ⁿ numbers. That's where both the excitement and the misunderstanding come from.</p>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>Picture a register of n qubits as a probability distribution over all 2ⁿ bitstrings that you can reshape with operations, but can only <i>sample</i> from, one bitstring per run. You never get to read the whole table. The art is to reshape the distribution so the good answers come out often. It is <b>not</b> "tries every answer in parallel and returns the best".</p>
+  </div>
+  <ul>
+    <li><b>Gates</b> are the operations. A gate acts on one or two qubits and rotates their amplitudes. Like instructions in assembly.</li>
+    <li><b>Circuit</b> is a sequence of gates, the program. You run it many times (called <b>shots</b>, e.g. 1,024) and get a histogram of measured bitstrings.</li>
+    <li><b>Superposition</b> is simply a state with nonzero amplitude on many bitstrings at once.</li>
+    <li><b>Entanglement</b> means the qubits' outcomes are correlated in a way that can't be described one qubit at a time, e.g. "these two always come out equal".</li>
+    <li><b>Interference</b> is the real trick. Amplitudes can be negative (in fact complex), so paths leading to a bad answer can cancel out while paths to a good answer add up. Algorithms are designed around this.</li>
+  </ul>
+  <p>In Python, <a href="https://qiskit-community.github.io/qiskit-optimization/tutorials/06_examples_max_cut_and_tsp.html">Qiskit</a> lets you build a circuit like any other object, then run it on a simulator or on IBM hardware.</p>
+
+  <h2 id="qaoa"><span class="eyebrow">Part 1 · Concept 5</span><br>QAOA, the algorithm we'll use</h2>
+  <p>The Quantum Approximate Optimization Algorithm (<a href="https://arxiv.org/abs/1411.4028">Farhi, Goldstone and Gutmann, 2014</a>) takes a QUBO and builds a circuit whose output samples are biased toward low-cost bitstrings. It alternates two kinds of layer:</p>
+  <ul>
+    <li><b>Cost layer, angle γ:</b> nudges each bitstring's amplitude by an amount that depends on its QUBO cost. Good and bad answers get "marked" differently.</li>
+    <li><b>Mixer layer, angle β:</b> lets amplitude flow between neighboring bitstrings, so the state can move toward the marked good ones.</li>
+  </ul>
+  <p>Repeat the pair <b>p</b> times (the <b>depth</b>). Bigger p can give better answers but a longer circuit, which hurts on noisy hardware.</p>
+  <figure>
+    <svg viewBox="0 0 680 210" role="img" aria-label="QAOA hybrid loop: a classical optimizer picks angles, the quantum circuit samples bitstrings, the average cost is fed back" style="width:100%;max-width:100%;height:auto">
+      <rect x="10" y="30" width="200" height="110" rx="10" fill="var(--surface)" stroke="var(--classical)" stroke-width="2"/>
+      <text x="110" y="65" text-anchor="middle" font-size="14" font-weight="600" fill="var(--classical)">Classical optimizer</text>
+      <text x="110" y="90" text-anchor="middle" font-size="12" fill="var(--muted)">(COBYLA, SPSA…)</text>
+      <text x="110" y="115" text-anchor="middle" font-size="12" fill="var(--fg)">picks γ₁…γₚ, β₁…βₚ</text>
+      <rect x="300" y="20" width="370" height="130" rx="10" fill="var(--surface)" stroke="var(--quantum)" stroke-width="2"/>
+      <text x="485" y="45" text-anchor="middle" font-size="14" font-weight="600" fill="var(--quantum)">Quantum circuit (× shots)</text>
+      <rect x="318" y="62" width="60" height="44" rx="6" fill="var(--tint)" stroke="var(--line)"/>
+      <text x="348" y="89" text-anchor="middle" font-size="12" fill="var(--fg)">H all</text>
+      <rect x="392" y="62" width="70" height="44" rx="6" fill="var(--tint)" stroke="var(--line)"/>
+      <text x="427" y="82" text-anchor="middle" font-size="12" fill="var(--fg)">cost</text>
+      <text x="427" y="98" text-anchor="middle" font-size="12" fill="var(--fg)">γ₁</text>
+      <rect x="470" y="62" width="70" height="44" rx="6" fill="var(--tint)" stroke="var(--line)"/>
+      <text x="505" y="82" text-anchor="middle" font-size="12" fill="var(--fg)">mixer</text>
+      <text x="505" y="98" text-anchor="middle" font-size="12" fill="var(--fg)">β₁</text>
+      <text x="560" y="89" text-anchor="middle" font-size="14" fill="var(--muted)">… ×p</text>
+      <rect x="590" y="62" width="66" height="44" rx="6" fill="var(--tint)" stroke="var(--line)"/>
+      <text x="623" y="89" text-anchor="middle" font-size="12" fill="var(--fg)">measure</text>
+      <text x="485" y="135" text-anchor="middle" font-size="12" fill="var(--muted)">returns a histogram of bitstrings</text>
+      <path d="M210 70 L296 70" stroke="var(--fg)" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+      <text x="253" y="62" text-anchor="middle" font-size="11" fill="var(--muted)">angles</text>
+      <path d="M485 150 L485 185 L110 185 L110 144" stroke="var(--fg)" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+      <text x="300" y="202" text-anchor="middle" font-size="11" fill="var(--muted)">average cost of the samples → try new angles</text>
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="var(--fg)"/></marker></defs>
+    </svg>
+    <figcaption>QAOA is a hybrid loop: a classical optimizer tunes 2p angles, the quantum part only evaluates them.</figcaption>
+  </figure>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>It's hyperparameter tuning. The circuit is a model with 2p knobs, the loss is the average QUBO cost of its samples, and a classical optimizer turns the knobs. At the end you take the best valid bitstring you ever sampled and decode it back into a path.</p>
+  </div>
+  <p>Known practical problems for path and routing QUBOs: many samples break the rules (broken or looping paths), the angle search gets stuck in flat regions as problems grow, and the qubit count outgrows simulators quickly. Variants that help: warm-starting from a classical solution, pruning edges that can't be on a good path before building the circuit, and constraint-preserving mixers.</p>
+
+  <h2 id="hardware"><span class="eyebrow">Part 1 · Concept 6</span><br>Simulators vs real quantum hardware</h2>
+  <p>A <b>statevector simulator</b> is an ordinary program that stores all 2ⁿ amplitudes in RAM (16 bytes each) and applies gates as matrix math. It is exact and noise-free, but memory doubles with every qubit.</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Static grid</th><th>Edges = qubits</th><th>Simulator RAM</th><th>Feasible?</th></tr></thead>
+      <tbody>
+        <tr><td class="num">2×3</td><td class="num">7</td><td class="num">2 KB</td><td><span class="pill ok">laptop</span></td></tr>
+        <tr><td class="num">3×3</td><td class="num">12</td><td class="num">64 KB</td><td><span class="pill ok">laptop</span></td></tr>
+        <tr><td class="num">3×4</td><td class="num">17</td><td class="num">2 MB</td><td><span class="pill ok">laptop</span></td></tr>
+        <tr><td class="num">4×4</td><td class="num">24</td><td class="num">256 MB</td><td><span class="pill q">slow but ok</span></td></tr>
+        <tr><td class="num">5×5</td><td class="num">40</td><td class="num">16 TB</td><td><span class="pill bad">only with pruning</span></td></tr>
+        <tr><td class="num">10×10</td><td class="num">180</td><td class="num">≈ 2.5 × 10⁵⁵ B</td><td><span class="pill bad">impossible</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Obstacles remove edges and classical pruning removes more, so real counts are a bit lower; a space-time grid multiplies them by the number of time steps. For comparison, A* solves a 1000×1000 grid in well under a second. Other simulators (tensor-network or "matrix product state") can go further for shallow circuits, but they have their own limits.</p>
+  <p><b>Real hardware</b> (e.g. IBM's machines, free tier available) has more than 100 qubits, but they are <b>noisy</b>: every gate has a small error rate, qubits lose their state within microseconds, and not every qubit can talk to every other, so extra "swap" gates get inserted. Deep QAOA circuits on 25+ qubits come out mostly as noise today. You also wait in a queue and pay per shot beyond the free allowance.</p>
+  <div class="analogy">
+    <span class="eyebrow">SDE analogy</span>
+    <p>The simulator is your local dev environment: perfect, deterministic-ish, but it can't scale. Hardware is production on flaky infrastructure with a cold-start queue. Our experiments will mostly live on the simulator, with maybe one small hardware run to show the noise effect.</p>
+  </div>
+
+  <h2 id="advantage"><span class="eyebrow">Part 1 · Concept 7</span><br>What "quantum advantage" honestly means today</h2>
+  <p>People use the phrase for three very different claims:</p>
+  <ul>
+    <li><b>Provable advantage:</b> a mathematical proof that a quantum algorithm needs fewer steps than any classical one (e.g. Shor's factoring). There is no such proof for QAOA on path planning.</li>
+    <li><b>Empirical scaling advantage:</b> as the problem grows, the quantum method's runtime grows more slowly than the best known classical method's. The strongest QAOA evidence is <a href="https://arxiv.org/abs/2308.02342">Shaydulin et al. (Science Advances, 2024)</a>: better scaling than branch-and-bound on the LABS problem, a problem chosen because it is hard for classical solvers. It used noiseless simulation up to 40 qubits plus small runs on trapped-ion hardware.</li>
+    <li><b>Practical advantage:</b> a real task solved faster, cheaper, or better on real hardware than the best classical approach. For path planning, routing and scheduling, this has <b>not</b> been demonstrated.</li>
+  </ul>
+  <p>There are also theoretical warnings. <a href="https://arxiv.org/abs/1910.08980">Bravyi et al. (PRL, 2020)</a> showed that low-depth QAOA provably underperforms a classical algorithm on some problem families. And a 2026 head-to-head on the related TSP routing problem (<a href="https://arxiv.org/html/2607.24581v1">Quantitative Framework, PEARC '26</a>) found simulated QAOA handled at most 7 cities and was beaten by simulated annealing on both quality and scalability.</p>
+  <div class="caveat">
+    <span class="eyebrow">What this means for us</span>
+    <p>Our honest expectation is that QAOA will not beat good classical methods at any size we can simulate. The valuable research output is the careful measurement: how path quality, valid-path rate, and cost scale with field size, obstacle density and depth p, and how far the gap is. A clean, reproducible "no, and here's exactly why" is a good paper and a strong portfolio piece.</p>
+  </div>
+
+  <h2 id="prior"><span class="eyebrow">Part 2</span><br>What already exists</h2>
+  <p>Our problem is a collision-free shortest path, so the shortest-path and grid-planning rows below are the closest match. The TSP and routing rows are useful background on how QAOA behaves on similar problems.</p>
+  <h3>Quantum approaches to path planning and routing</h3>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Work</th><th>What they did</th><th>Takeaway</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://arxiv.org/abs/1302.5843">Lucas 2014</a></td><td>QUBO/Ising formulations of many NP-hard problems, including TSP</td><td>The standard n²-qubit TSP encoding we'll use</td></tr>
+        <tr><td><a href="https://qiskit-community.github.io/qiskit-optimization/tutorials/06_examples_max_cut_and_tsp.html">Qiskit Optimization tutorial</a></td><td>Max-Cut and TSP solved with QAOA/VQE on a simulator</td><td>Working starter code; 3 to 4 city examples</td></tr>
+        <tr><td><a href="https://arxiv.org/html/2607.24581v1">TSP classical vs quantum framework (2026)</a></td><td>Open framework comparing brute force, MST, simulated annealing, and QAOA</td><td>Closest to our study; QAOA not competitive, capped at 7 cities</td></tr>
+        <tr><td><a href="https://arxiv.org/html/2604.25531">Quantum methods for Generalized TSP (2026)</a></td><td>Quantum formulations for the variant where you pick one city from each group</td><td>Background on routing variants</td></tr>
+        <tr><td><a href="https://ui.adsabs.harvard.edu/abs/2023Spin...1350002F/abstract">Shortest path with QAOA (2023)</a>, <a href="https://arxiv.org/abs/2510.07413">Parallel QAOA grid planning (2025)</a></td><td>QAOA for point-to-point paths on small graphs and grids</td><td><b>Closest to our problem.</b> Toy sizes, static obstacles, relies on classical filtering</td></tr>
+        <tr><td><a href="https://arxiv.org/html/2602.14799">Multi-robot path planning via QUBO (2026)</a></td><td>QUBO formulation for coordinating several robots</td><td>Shows the QUBO modelling style for robotics</td></tr>
+        <tr><td><a href="https://arxiv.org/abs/1903.06322v1">VRP with annealing (2019)</a>, <a href="https://arxiv.org/abs/2203.13469">weighted-segment VRP (2022)</a>, <a href="https://arxiv.org/html/2503.24285">VRP with time windows (2025)</a></td><td>Vehicle routing on D-Wave annealers, mostly hybrid</td><td>Hybrid quantum-classical is the norm; pure quantum doesn't scale yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Quantum optimization for space missions</h3>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Work</th><th>What they did</th><th>Takeaway</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://link.springer.com/article/10.1140/epjqt/s40507-025-00409-3">Multi-target debris removal (EPJ Quantum Tech, 2025)</a></td><td>Choose and order which space-debris pieces to capture (a TSP-like tour with Δv, time of flight, priority) as a QUBO on D-Wave; compared with simulated annealing, tabu search, and genetic algorithms</td><td>Closest space application. Visits debris rather than avoiding it, and uses annealing, not QAOA</td></tr>
+        <tr><td><a href="https://www.mdpi.com/2076-3417/13/23/12853">Carbone, De Grossi, Spiller 2023</a></td><td>Lunar landing and rendezvous trajectories as QUBO on D-Wave, vs particle swarm and interior-point</td><td>Continuous trajectories can be squeezed into QUBO</td></tr>
+        <tr><td><a href="https://link.springer.com/article/10.1007/s42064-024-0216-6">De Grossi et al. 2025</a></td><td>Earth-to-Mars low-thrust transfer via quantum annealing</td><td>Hybrid solver works; full quantum limited by hardware</td></tr>
+        <tr><td><a href="https://arxiv.org/abs/2006.09724">Earth-observation satellite planning (2020)</a></td><td>Scheduling satellite image captures on a quantum annealer</td><td>Another space scheduling problem in QUBO form</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Classical state of the art for navigating hazards</h3>
+  <p>Classical path planning is mature. A* and its variants (D* Lite for replanning when obstacles move) and sampling planners like RRT* run on real robots and rovers today, and spacecraft collision avoidance is an established field. Multi-asteroid mission design is also a competitive sport: ESA's <a href="https://sophia.estec.esa.int/gtoc_portal/">Global Trajectory Optimisation Competition</a> publishes realistic asteroid data we can borrow for test scenarios.</p>
+
+  <h3>Where this project can still add something</h3>
+  <ul>
+    <li>Quantum path-planning papers use toy grids with static obstacles. We found none that models a <b>space hazard field</b> with moving asteroids and debris and fuel-style costs.</li>
+    <li>Space papers use <span class="q">D-Wave quantum annealing</span> for trajectories or debris-capture order, not <span class="q">gate-based QAOA</span> for obstacle avoidance.</li>
+    <li>Most papers don't publish runnable code. A clean, reproducible benchmark against A*, Dijkstra and simulated annealing, with a visualizer, is itself a contribution.</li>
+    <li>Comparing QAOA variants (standard vs warm-start vs classical edge pruning) on this problem is a small but real research question.</li>
+  </ul>
+
+  <h2 id="plan"><span class="eyebrow">Part 3</span><br>Should the plan change?</h2>
+  <p>The four-thread structure is sound. I'd keep it and adjust five things:</p>
+  <div class="rec">
+    <span class="n">1</span><div><b>Model it as a path through a hazard field.</b> Grid graph with blocked cells for asteroids and debris, a space-time grid for moving ones, and edge costs that approximate Δv.</div>
+    <span class="n">2</span><div><b>Reframe the research question.</b> Instead of "at what size does quantum win", ask "how do QAOA's path quality, valid-path rate, and cost scale with field size and depth, and how big is the gap to classical?" The answer is likely "no crossover in reach", and that's fine.</div>
+    <span class="n">3</span><div><b>Keep A* and Dijkstra as the main baselines</b>, and add simulated annealing on the exact same QUBO for an apples-to-apples comparison.</div>
+    <span class="n">4</span><div><b>Keep QAOA grids small</b> (about 3×3 to 4×4 on the simulator), sweep depth p = 1 to 5, and try one improved variant (warm start or edge pruning). One small run on IBM hardware is a nice stretch goal.</div>
+    <span class="n">5</span><div><b>Add one realistic scenario</b> built from real asteroid or debris positions scaled down to a small grid, so the project is clearly about space.</div>
+  </div>
+  <p class="lede" style="font-size:.95rem">Sources are linked inline. Summaries of each paper come from its abstract or publisher page; exact numbers should be checked against the paper before citing in our write-up.</p>
+</div>
+
+</body>
+</html>

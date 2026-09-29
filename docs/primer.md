@@ -1,6 +1,6 @@
 # Primer: quantum navigation through asteroids from scratch
 
-Written for software engineers with no background in quantum computing or path planning. An illustrated version is on the [primer page](https://claude.ai/artifact/THB5rTNHg3Tk2kqDr5pBuy).
+Written for software engineers with no background in quantum computing or path planning. An illustrated version is on the [project website](https://cypher-ravi.github.io/qaoa-space-pathfinding/).
 
 ## 1. Path planning is an optimization problem
 
