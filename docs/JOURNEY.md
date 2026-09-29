@@ -42,6 +42,17 @@ What changed:
 
 Created this repo, [qaoa-space-pathfinding](https://github.com/cypher-ravi/qaoa-space-pathfinding), to document the project from the start. Everything above this entry was written before the repo existed.
 
+## 2026-09-29 · Trajectory and navigation together
+
+Clarified again: the project covers **both** finding a fuel-efficient trajectory **and** navigating around asteroids and debris.
+
+What changed:
+- The model is now a *state lattice*: position and velocity at each time step. Coasting is free, burns cost Δv, and states that hit a hazard are removed. This adds momentum to the plain grid path.
+- A* and Dijkstra still fit, run over the state lattice instead of a flat grid.
+- The QAOA encoding becomes one qubit per (time step, state), so quantum scenarios stay very small.
+- The quantum trajectory-optimization papers (Carbone et al. 2023, De Grossi et al. 2025) are now directly relevant prior work.
+- [Decision 0001](decisions/0001-reframe-research-question.md) was updated to match (still proposed).
+
 ## 2026-09-29 · Project website
 
 Published the illustrated primer at https://cypher-ravi.github.io/qaoa-space-pathfinding/ via GitHub Pages. The site lives in `site/`, and the interactive visualizer will be added there later.

@@ -9,9 +9,11 @@ Path planning covers two questions:
 - **Point-to-point:** how do I get from A to B while avoiding obstacles?
 - **Ordering, or routing:** in what order do I visit many places? (the Traveling Salesman Problem)
 
-**Our project is the first kind.** A spacecraft must cross a field of asteroids and debris to reach a goal without collisions, using the least fuel (Δv). We turn space into a graph: a grid of safe cells, with cells occupied by asteroids or debris removed. Because obstacles move, we can stack the grid over time (a *space-time grid*), so a node means "this cell at this moment".
+**Our project is the first kind, with physics.** A spacecraft must reach a goal through a field of asteroids and debris. We want a **trajectory** (its route through space over time) that uses the least fuel (Δv) and **never collides**.
 
-> **SDE analogy:** routing a packet through a network where some links are down, and the set of down links changes every tick. Find the cheapest route that never touches a dead link.
+Space differs from a road map in one key way: **momentum**. A spacecraft keeps drifting at its current velocity for free, and every change of speed or direction needs a burn that costs fuel. So we plan over *states*, not just positions: a state is (position, velocity) at a moment in time. Each step, the spacecraft either coasts or fires a small burn, which decides the next state. States that overlap an asteroid or debris at that moment are removed. This graph of states is called a **state lattice**.
+
+> **SDE analogy:** a state machine where each transition has a cost. Nodes are (position, velocity, time), edges are "coast" or "burn", and some nodes are forbidden because a rock is there at that moment. Find the cheapest run from the start state to any goal state.
 
 The search space grows fast: even a 10×10 grid has an enormous number of possible paths, so you need a clever search, not enumeration.
 
@@ -20,7 +22,8 @@ The search space grows fast: even a 10×10 grid has an enormous number of possib
 - **Brute force:** try every order, O(n!). Practical to about 10 to 12 asteroids.
 - **Held–Karp:** dynamic programming that memoizes "best cost having visited this set and standing at asteroid k". O(n²·2ⁿ), practical to about 20 to 25. Gives the true optimum, our ground truth.
 - **Dijkstra:** explores the graph outward from the start in order of cost using a priority queue; guaranteed shortest path.
-- **A\*:** Dijkstra plus a heuristic estimate of the remaining distance (e.g. straight-line distance to the goal), so it explores promising directions first. **The standard tool for our problem**, and the main baseline.
+- **A\*:** Dijkstra plus a heuristic estimate of the remaining cost, so it explores promising directions first. Run over a state lattice it's called *kinodynamic* planning. **The standard tool for our problem**, and the main baseline.
+- **Continuous trajectory optimization:** real missions optimize smooth trajectories with calculus-based solvers (e.g. direct collocation). We use a discrete lattice instead so that classical and quantum solvers attack exactly the same problem.
 - **Integer Linear Programming (ILP):** describe variables, constraints and objective; a solver (OR-Tools, HiGHS, Gurobi) prunes the search with branch-and-bound. *Analogy: SQL for optimization. You say what, the engine figures out how.*
 - **Simulated annealing:** random swaps; keep improvements, sometimes accept worse moves with a probability that shrinks over time. Fast and simple, and usually what QAOA loses to.
 
@@ -32,7 +35,7 @@ Quantum optimizers accept one problem shape: **Quadratic Unconstrained Binary Op
 - Cost is a sum of terms with at most two bits: `cost(x) = Σ Q_ij · x_i · x_j`.
 - No separate constraints. Rules become **penalty terms** added to the cost.
 
-For a path, `x[e] = 1` means "edge e is part of the path". That needs one bit per usable edge.
+Warm-up version, a static path: `x[e] = 1` means "edge e is part of the path", one bit per usable edge. The full trajectory version uses one bit per (time step, state), with a pairwise term for the Δv of each allowed transition and penalties for impossible ones. Same idea, more bits.
 
 ```
 cost(x) =  Σ_e dv[e] * x[e]                            # fuel for each step taken

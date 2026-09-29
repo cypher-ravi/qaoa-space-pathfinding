@@ -79,7 +79,7 @@ svg text{font-family:var(--mono)}
 <div class="wrap">
   <div class="eyebrow">Primer · <a href="https://github.com/cypher-ravi/qaoa-space-pathfinding">qaoa-space-pathfinding on GitHub</a></div>
   <h1>QAOA Space Pathfinding Primer</h1>
-  <p class="lede">Everything you need to follow the project on navigating a spacecraft through asteroids and debris, explained for a software engineer who has never touched quantum computing or path planning. Part 1 builds the concepts from zero. Part 2 surveys what already exists. Part 3 says what that means for our plan.</p>
+  <p class="lede">Everything you need to follow the project on finding spacecraft trajectories that navigate through asteroids and debris, explained for a software engineer who has never touched quantum computing or path planning. Part 1 builds the concepts from zero. Part 2 surveys what already exists. Part 3 says what that means for our plan.</p>
 
   <nav class="toc" aria-label="Contents">
     <a href="#problem">1 Routing as optimization</a>
@@ -96,9 +96,9 @@ svg text{font-family:var(--mono)}
   <section class="tldr" aria-label="Short version">
     <h2>The short version</h2>
     <ul>
-      <li>Our problem is <b>navigating a spacecraft through a field of asteroids and debris</b>: the cheapest collision-free path from start to goal. That is a shortest-path problem on a graph, the home turf of A*.</li>
+      <li>Our problem has two halves: find a fuel-efficient <b>trajectory</b> for a spacecraft, and make it <b>navigate</b> safely around moving asteroids and debris. We model both as a shortest path over a graph of (position, velocity, time) states, the home turf of A*.</li>
       <li>People have already run <b>QAOA on small shortest-path and grid path-planning problems</b>, on small routing problems (TSP), and <b>quantum annealing on space problems</b> (trajectories, debris removal). The consistent finding: at sizes today's machines and simulators can handle, good classical methods win.</li>
-      <li>So the "threshold where quantum beats classical" will very likely not appear in our experiments. That is still a publishable, useful result if we measure it carefully. What's missing in the literature is an <b>open, reproducible, gate-based QAOA benchmark for navigating a realistic hazard field</b> (moving asteroids and debris, fuel-style costs). That is where we can add something.</li>
+      <li>So the "threshold where quantum beats classical" will very likely not appear in our experiments. That is still a publishable, useful result if we measure it carefully. What's missing in the literature is an <b>open, reproducible, gate-based QAOA benchmark that combines trajectory planning with hazard avoidance</b> (momentum, fuel costs, moving asteroids and debris). That is where we can add something.</li>
     </ul>
   </section>
 
@@ -108,19 +108,21 @@ svg text{font-family:var(--mono)}
     <li><b>Point-to-point:</b> how do I get from A to B while avoiding obstacles? (Google Maps directions, a robot crossing a room.)</li>
     <li><b>Ordering, or routing:</b> I must visit many places. In what order should I visit them so the total cost is lowest? (A delivery driver's day, a spacecraft touring asteroids.)</li>
   </ul>
-  <p><b>Our project is the first kind.</b> A spacecraft must cross a field of asteroids and debris to reach a goal without a collision, using as little fuel as possible (fuel is measured as <b>Δv</b>, "delta-v", the change in velocity the engine must deliver). We turn space into a graph: a grid of cells, with cells occupied by an asteroid or debris removed. Because obstacles move, we can stack the grid over time into a <b>space-time grid</b>, where a node means "this cell at this moment".</p>
+  <p><b>Our project is the first kind, with physics.</b> A spacecraft must reach a goal through a field of asteroids and debris. We want a <b>trajectory</b> (its route through space over time) that uses the least fuel and <b>never collides</b>. Fuel is measured as <b>Δv</b>, "delta-v", the change in velocity the engine must deliver.</p>
+  <p>Space differs from a road map in one key way: <b>momentum</b>. A spacecraft keeps drifting at its current velocity for free, and every change of speed or direction needs a burn that costs Δv. So we plan over <i>states</i>, not just positions: a state is (position, velocity) at a moment in time. Each step the spacecraft either coasts or fires a small burn, which decides the next state. States that overlap an asteroid or debris at that moment are removed. This graph of states is called a <b>state lattice</b>.</p>
   <div class="analogy">
     <span class="eyebrow">SDE analogy</span>
-    <p>It is like routing a packet through a network where some links are down, and the set of down links changes every tick. Find the cheapest route that never touches a dead link. The number of possible routes explodes with grid size, so you need a clever search, not enumeration.</p>
+    <p>It is a state machine where each transition has a cost. Nodes are (position, velocity, time), edges are "coast" or "burn", and some nodes are forbidden because a rock is there at that moment. Find the cheapest run from the start state to a goal state. The number of possible runs explodes, so you need a clever search, not enumeration.</p>
   </div>
-  <p>"Optimization" just means: define a <b>cost function</b> (total Δv), define the <b>constraints</b> (start at the start, end at the goal, never enter a blocked cell), and find the input that minimizes cost while respecting constraints. Every solver in this project, classical or quantum, is a different strategy for that same search.</p>
+  <p>"Optimization" just means: define a <b>cost function</b> (total Δv), define the <b>constraints</b> (start at the start, end at the goal, obey momentum, never touch a hazard), and find the input that minimizes cost while respecting constraints. Every solver in this project, classical or quantum, is a different strategy for that same search.</p>
 
   <h2 id="classical"><span class="eyebrow">Part 1 · Concept 2</span><br>Classical solvers</h2>
   <p>These are the baselines the quantum approach has to beat.</p>
   <h3>Dijkstra (exact)</h3>
   <p>Start at the start node and expand outward, always taking the cheapest unexplored node next from a priority queue. When you pop the goal, you have the guaranteed cheapest path. Runs in O(E log V), so it handles grids with millions of cells easily. It is our ground truth for scoring every other method.</p>
   <h3>A* search (the main baseline)</h3>
-  <p>A* is Dijkstra plus a heuristic that guesses the remaining cost, such as the straight-line distance to the goal. Nodes are prioritized by "cost so far + estimated cost to goal", so it explores toward the goal first and skips most of the grid. If the guess never overestimates, the answer is still optimal. It is the standard tool for exactly our problem: games, robots, and rovers all use it.</p>
+  <p>A* is Dijkstra plus a heuristic that guesses the remaining cost, such as the straight-line distance to the goal. Nodes are prioritized by "cost so far + estimated cost to goal", so it explores toward the goal first and skips most of the grid. If the guess never overestimates, the answer is still optimal. It is the standard tool for exactly our problem: games, robots, and rovers all use it. Run over a state lattice it's called <b>kinodynamic</b> planning.</p>
+  <p>Real missions also use <b>continuous trajectory optimization</b>: calculus-based solvers that shape a smooth path (for example direct collocation). We stick to a discrete lattice so that classical and quantum solvers attack exactly the same problem.</p>
   <div class="analogy">
     <span class="eyebrow">SDE analogy</span>
     <p>Dijkstra is a BFS where the queue is a min-heap on cost. A* is the same code with one extra term in the heap key. That tiny change is why it's so fast in practice.</p>
@@ -142,6 +144,7 @@ svg text{font-family:var(--mono)}
     <li><b>Unconstrained:</b> there are no separate rules. Any rule must be baked into the cost.</li>
   </ul>
   <p>For a path, the usual trick (in the style of <a href="https://arxiv.org/abs/1302.5843">Lucas 2014</a>) uses one bit per edge of the grid: <code>x[e] = 1</code> means "edge <i>e</i> is part of the path". Rules like "whatever enters a cell must leave it" become <b>penalty terms</b>: a big number added to the cost whenever a rule is broken. Blocked cells are simply removed from the graph, so their edges never become bits.</p>
+  <p>The example below is the warm-up: a static path with no momentum. The full trajectory version uses one bit per (time step, state), "the spacecraft is in this state at this time", with a pairwise term for the Δv of each allowed transition and a penalty for impossible ones. Same idea, more bits.</p>
 <pre># 3x3 grid, start S top-left, goal G bottom-right, one debris cell X
 #   S - . - .
 #   |   |   |
@@ -277,7 +280,7 @@ cost(x) =  Σ_e  dv[e] * x[e]                             # fuel for each step
       <thead><tr><th>Work</th><th>What they did</th><th>Takeaway</th></tr></thead>
       <tbody>
         <tr><td><a href="https://link.springer.com/article/10.1140/epjqt/s40507-025-00409-3">Multi-target debris removal (EPJ Quantum Tech, 2025)</a></td><td>Choose and order which space-debris pieces to capture (a TSP-like tour with Δv, time of flight, priority) as a QUBO on D-Wave; compared with simulated annealing, tabu search, and genetic algorithms</td><td>Closest space application. Visits debris rather than avoiding it, and uses annealing, not QAOA</td></tr>
-        <tr><td><a href="https://www.mdpi.com/2076-3417/13/23/12853">Carbone, De Grossi, Spiller 2023</a></td><td>Lunar landing and rendezvous trajectories as QUBO on D-Wave, vs particle swarm and interior-point</td><td>Continuous trajectories can be squeezed into QUBO</td></tr>
+        <tr><td><a href="https://www.mdpi.com/2076-3417/13/23/12853">Carbone, De Grossi, Spiller 2023</a></td><td>Lunar landing and rendezvous trajectories as QUBO on D-Wave, vs particle swarm and interior-point</td><td><b>Closest on the trajectory side.</b> Fuel-optimal trajectories as QUBO, but no obstacles</td></tr>
         <tr><td><a href="https://link.springer.com/article/10.1007/s42064-024-0216-6">De Grossi et al. 2025</a></td><td>Earth-to-Mars low-thrust transfer via quantum annealing</td><td>Hybrid solver works; full quantum limited by hardware</td></tr>
         <tr><td><a href="https://arxiv.org/abs/2006.09724">Earth-observation satellite planning (2020)</a></td><td>Scheduling satellite image captures on a quantum annealer</td><td>Another space scheduling problem in QUBO form</td></tr>
       </tbody>
@@ -289,19 +292,19 @@ cost(x) =  Σ_e  dv[e] * x[e]                             # fuel for each step
 
   <h3>Where this project can still add something</h3>
   <ul>
-    <li>Quantum path-planning papers use toy grids with static obstacles. We found none that models a <b>space hazard field</b> with moving asteroids and debris and fuel-style costs.</li>
-    <li>Space papers use <span class="q">D-Wave quantum annealing</span> for trajectories or debris-capture order, not <span class="q">gate-based QAOA</span> for obstacle avoidance.</li>
+    <li>Quantum path-planning papers use toy grids with static obstacles and no momentum. Quantum trajectory papers optimize fuel but ignore obstacles. We found <b>no work that combines trajectory planning with hazard avoidance</b>.</li>
+    <li>Space papers use <span class="q">D-Wave quantum annealing</span>, not <span class="q">gate-based QAOA</span>.</li>
     <li>Most papers don't publish runnable code. A clean, reproducible benchmark against A*, Dijkstra and simulated annealing, with a visualizer, is itself a contribution.</li>
-    <li>Comparing QAOA variants (standard vs warm-start vs classical edge pruning) on this problem is a small but real research question.</li>
+    <li>Comparing QAOA variants (standard vs warm-start vs classical pruning) on this problem is a small but real research question.</li>
   </ul>
 
   <h2 id="plan"><span class="eyebrow">Part 3</span><br>Should the plan change?</h2>
   <p>The four-thread structure is sound. I'd keep it and adjust five things:</p>
   <div class="rec">
-    <span class="n">1</span><div><b>Model it as a path through a hazard field.</b> Grid graph with blocked cells for asteroids and debris, a space-time grid for moving ones, and edge costs that approximate Δv.</div>
-    <span class="n">2</span><div><b>Reframe the research question.</b> Instead of "at what size does quantum win", ask "how do QAOA's path quality, valid-path rate, and cost scale with field size and depth, and how big is the gap to classical?" The answer is likely "no crossover in reach", and that's fine.</div>
-    <span class="n">3</span><div><b>Keep A* and Dijkstra as the main baselines</b>, and add simulated annealing on the exact same QUBO for an apples-to-apples comparison.</div>
-    <span class="n">4</span><div><b>Keep QAOA grids small</b> (about 3×3 to 4×4 on the simulator), sweep depth p = 1 to 5, and try one improved variant (warm start or edge pruning). One small run on IBM hardware is a nice stretch goal.</div>
+    <span class="n">1</span><div><b>Model trajectory and navigation together.</b> A state lattice of (position, velocity, time): coasting is free, burns cost Δv, and states that hit an asteroid or debris are removed. Start with a static grid path as a warm-up.</div>
+    <span class="n">2</span><div><b>Reframe the research question.</b> Instead of "at what size does quantum win", ask "how do QAOA's trajectory quality, valid-trajectory rate, and cost scale with problem size and depth, and how big is the gap to classical?" The answer is likely "no crossover in reach", and that's fine.</div>
+    <span class="n">3</span><div><b>Keep A* and Dijkstra (over the state lattice) as the main baselines</b>, and add simulated annealing on the exact same QUBO for an apples-to-apples comparison.</div>
+    <span class="n">4</span><div><b>Keep QAOA scenarios tiny</b> (a few time steps on a small grid, or a 3×3 to 4×4 static path, on the simulator), sweep depth p = 1 to 5, and try one improved variant (warm start or edge pruning). One small run on IBM hardware is a nice stretch goal.</div>
     <span class="n">5</span><div><b>Add one realistic scenario</b> built from real asteroid or debris positions scaled down to a small grid, so the project is clearly about space.</div>
   </div>
   <p class="lede" style="font-size:.95rem">Sources are linked inline. Summaries of each paper come from its abstract or publisher page; exact numbers should be checked against the paper before citing in our write-up.</p>

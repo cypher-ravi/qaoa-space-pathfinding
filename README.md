@@ -1,17 +1,22 @@
 # QAOA Space Pathfinding
 
-Can a quantum algorithm (QAOA) plan a better path through an asteroid and debris field than classical path planners? This repo is the honest, reproducible answer, plus a record of how we got there.
+Can a quantum algorithm (QAOA) find a better spacecraft trajectory through an asteroid and debris field than classical planners? This repo is the honest, reproducible answer, plus a record of how we got there.
 
 > **Status (2026-09-29):** Research and planning. No code yet. See [the journey log](docs/JOURNEY.md) for where we are.
 
 ## The question
 
-A spacecraft must get from a start point to a goal through a field of asteroids and debris, without hitting anything and using as little fuel (Δv) as possible. We model space as a graph of safe waypoints (a grid, extended over time when obstacles move) and look for the cheapest collision-free path. We compare:
+A spacecraft must get from a start point to a goal. We want two things at once:
+
+- **Trajectory:** a fuel-efficient route through space over time. The spacecraft has momentum, so coasting is free and every change of speed or direction (a burn) costs fuel, measured as Δv.
+- **Navigation:** the route must never come near an asteroid or a piece of debris, even though they move.
+
+We model this as a *state lattice*: a grid of positions and velocities at each time step. A trajectory is a sequence of states, each step either coasting or firing a small burn, and states that collide with a hazard are removed. We look for the lowest-Δv collision-free trajectory. We compare:
 
 - **Classical solvers:** Dijkstra and A* (the standard path planners), an exact ILP solver, and simulated annealing
 - **Quantum solver:** QAOA in Qiskit on the same problem written as a QUBO, run on a simulator (and maybe once on real IBM hardware)
 
-We measure path cost, how often the quantum solver returns a valid collision-free path, and runtime as the field grows (grid size, number of obstacles).
+We measure trajectory cost (total Δv), how often the quantum solver returns a valid collision-free trajectory, and runtime as the problem grows (grid size, time steps, number of hazards).
 
 ## Roadmap
 

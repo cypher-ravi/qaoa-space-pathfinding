@@ -1,6 +1,6 @@
 # Prior work
 
-What already exists, and where this project can add something. Our problem is navigating **through** an asteroid and debris field (a collision-free shortest path), so the shortest-path and grid-planning rows are the most directly relevant; the TSP and routing rows are useful background. Summaries come from each paper's abstract or publisher page; check exact numbers in the paper before citing.
+What already exists, and where this project can add something. Our problem is finding a fuel-efficient **trajectory** that **navigates** a moving asteroid and debris field. The shortest-path and grid-planning rows cover the navigation side, the quantum trajectory-optimization papers (Carbone et al., De Grossi et al.) cover the trajectory side, and the TSP and routing rows are useful background. Summaries come from each paper's abstract or publisher page; check exact numbers in the paper before citing.
 
 ## Quantum approaches to TSP, routing and path planning
 
@@ -37,7 +37,7 @@ What already exists, and where this project can add something. Our problem is na
 
 ## Our gap
 
-1. Quantum path-planning papers use toy grids with static obstacles. None we found models a space hazard field (moving asteroids and debris, Δv-style costs).
-2. Space papers use D-Wave annealing for trajectories or debris-capture order, not gate-based QAOA for obstacle avoidance.
+1. Quantum path-planning papers use toy grids with static obstacles and no momentum. None we found models a space hazard field (moving asteroids and debris, Δv costs).
+2. Quantum trajectory papers optimize fuel with D-Wave annealing but don't include obstacle avoidance. We found no work combining trajectory and hazard avoidance, and none using gate-based QAOA.
 3. Most papers ship no runnable code. A reproducible benchmark against A*, Dijkstra and simulated annealing, with a visualizer, is itself a contribution.
 4. Comparing QAOA variants (standard vs warm start or classical edge pruning) on this problem is a small, real research question.
